@@ -13,21 +13,50 @@ import pickle
 from tqdm import tqdm
 from unicore import checkpoint_utils
 import unicore
-from unicore.data import (AppendTokenDataset, Dictionary, EpochShuffleDataset,
-                          FromNumpyDataset, NestedDictionaryDataset,
-                          PrependTokenDataset, RawArrayDataset,LMDBDataset, RawLabelDataset,
-                          RightPadDataset, RightPadDataset2D, TokenizeDataset,SortDataset,data_utils)
+from unicore.data import (
+    AppendTokenDataset,
+    Dictionary,
+    EpochShuffleDataset,
+    FromNumpyDataset,
+    NestedDictionaryDataset,
+    PrependTokenDataset,
+    RawArrayDataset,
+    LMDBDataset,
+    RawLabelDataset,
+    RightPadDataset,
+    RightPadDataset2D,
+    TokenizeDataset,
+    SortDataset,
+    data_utils,
+)
 from unicore.tasks import UnicoreTask, register_task
-from unimol.data import (AffinityDataset, CroppingPocketDataset,
-                         CrossDistanceDataset, DistanceDataset,
-                         EdgeTypeDataset, KeyDataset, LengthDataset,
-                         NormalizeDataset, NormalizeDockingPoseDataset,
-                         PrependAndAppend2DDataset, RemoveHydrogenDataset,
-                         RemoveHydrogenPocketDataset, RightPadDatasetCoord,
-                         RightPadDatasetCross2D, TTADockingPoseDataset, AffinityTestDataset, AffinityValidDataset, AffinityMolDataset, AffinityPocketDataset, ResamplingDataset)
-#from skchem.metrics import bedroc_score
+from unimol.data import (
+    AffinityDataset,
+    CroppingPocketDataset,
+    CrossDistanceDataset,
+    DistanceDataset,
+    EdgeTypeDataset,
+    KeyDataset,
+    LengthDataset,
+    NormalizeDataset,
+    NormalizeDockingPoseDataset,
+    PrependAndAppend2DDataset,
+    RemoveHydrogenDataset,
+    RemoveHydrogenPocketDataset,
+    RightPadDatasetCoord,
+    RightPadDatasetCross2D,
+    TTADockingPoseDataset,
+    AffinityTestDataset,
+    AffinityValidDataset,
+    AffinityMolDataset,
+    AffinityPocketDataset,
+    ResamplingDataset,
+)
+
+# from skchem.metrics import bedroc_score
 from rdkit.ML.Scoring.Scoring import CalcBEDROC, CalcAUC, CalcEnrichment
 from sklearn.metrics import roc_curve
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +65,7 @@ def re_new(y_true, y_score, ratio):
     tp = 0
     p = sum(y_true)
     n = len(y_true) - p
-    num = ratio*n
+    num = ratio * n
     sort_index = np.argsort(y_score)[::-1]
     for i in range(len(sort_index)):
         index = sort_index[i]
@@ -44,14 +73,14 @@ def re_new(y_true, y_score, ratio):
             tp += 1
         else:
             fp += 1
-            if fp>= num:
+            if fp >= num:
                 break
-    return (tp*n)/(p*fp)
+    return (tp * n) / (p * fp)
 
 
 def calc_re(y_true, y_score, ratio_list):
     fpr, tpr, thresholds = roc_curve(y_true, y_score, pos_label=1)
-    #print(fpr, tpr)
+    # print(fpr, tpr)
     res = {}
     res2 = {}
     total_active_compounds = sum(y_true)
@@ -66,13 +95,14 @@ def calc_re(y_true, y_score, ratio_list):
     #             else:
     #                 res[str(ratio)]=tpr[i-1]/fpr[i-1]
     #             break
-    
+
     for ratio in ratio_list:
         res2[str(ratio)] = re_new(y_true, y_score, ratio)
 
-    #print(res)
-    #print(res2)
+    # print(res)
+    # print(res2)
     return res2
+
 
 def cal_metrics(y_true, y_score, alpha):
     """
@@ -86,18 +116,18 @@ def cal_metrics(y_true, y_score, alpha):
     Returns:
     - BEDROC score
     """
-    
-        # concate res_single and labels
+
+    # concate res_single and labels
     scores = np.expand_dims(y_score, axis=1)
     y_true = np.expand_dims(y_true, axis=1)
     scores = np.concatenate((scores, y_true), axis=1)
     # inverse sort scores based on first column
-    scores = scores[scores[:,0].argsort()[::-1]]
+    scores = scores[scores[:, 0].argsort()[::-1]]
     bedroc = CalcBEDROC(scores, 1, 80.5)
     count = 0
     # sort y_score, return index
-    index  = np.argsort(y_score)[::-1]
-    for i in range(int(len(index)*0.005)):
+    index = np.argsort(y_score)[::-1]
+    for i in range(int(len(index) * 0.005)):
         if y_true[index[i]] == 1:
             count += 1
     auc = CalcAUC(scores, 1)
@@ -106,11 +136,10 @@ def cal_metrics(y_true, y_score, alpha):
         "0.005": ef_list[0],
         "0.01": ef_list[1],
         "0.02": ef_list[2],
-        "0.05": ef_list[3]
+        "0.05": ef_list[3],
     }
     re_list = calc_re(y_true, y_score, [0.005, 0.01, 0.02, 0.05])
     return auc, bedroc, ef, re_list
-
 
 
 @register_task("drugclip")
@@ -186,7 +215,7 @@ class DrugCLIP(UnicoreTask):
         if split.startswith("train"):
             smi_dataset = KeyDataset(dataset, "smi")
             poc_dataset = KeyDataset(dataset, "pocket")
-            
+
             dataset = AffinityDataset(
                 dataset,
                 self.args.seed,
@@ -198,9 +227,8 @@ class DrugCLIP(UnicoreTask):
                 True,
             )
             tgt_dataset = KeyDataset(dataset, "affinity")
-            
+
         else:
-            
             dataset = AffinityDataset(
                 dataset,
                 self.args.seed,
@@ -213,7 +241,6 @@ class DrugCLIP(UnicoreTask):
             tgt_dataset = KeyDataset(dataset, "affinity")
             smi_dataset = KeyDataset(dataset, "smi")
             poc_dataset = KeyDataset(dataset, "pocket")
-
 
         def PrependAndAppend(dataset, pre_token, app_token):
             dataset = PrependTokenDataset(dataset, pre_token)
@@ -235,7 +262,6 @@ class DrugCLIP(UnicoreTask):
         )
 
         dataset = RemoveHydrogenDataset(dataset, "atoms", "coordinates", True, True)
-
 
         apo_dataset = NormalizeDataset(dataset, "coordinates")
         apo_dataset = NormalizeDataset(apo_dataset, "pocket_coordinates")
@@ -310,7 +336,7 @@ class DrugCLIP(UnicoreTask):
                         pad_idx=0,
                     ),
                     "mol_len": RawArrayDataset(mol_len_dataset),
-                    "pocket_len": RawArrayDataset(pocket_len_dataset)
+                    "pocket_len": RawArrayDataset(pocket_len_dataset),
                 },
                 "target": {
                     "finetune_target": RawLabelDataset(tgt_dataset),
@@ -327,17 +353,11 @@ class DrugCLIP(UnicoreTask):
                 nest_dataset,
                 sort_order=[shuffle],
             )
-            self.datasets[split] = ResamplingDataset(
-                self.datasets[split]
-            )
+            self.datasets[split] = ResamplingDataset(self.datasets[split])
         else:
             self.datasets[split] = nest_dataset
 
-
-    
-
-    def load_mols_dataset(self, data_path,atoms,coords, **kwargs):
- 
+    def load_mols_dataset(self, data_path, atoms, coords, **kwargs):
         dataset = LMDBDataset(data_path)
         label_dataset = KeyDataset(dataset, "label")
         dataset = AffinityMolDataset(
@@ -347,17 +367,14 @@ class DrugCLIP(UnicoreTask):
             coords,
             False,
         )
-        
+
         smi_dataset = KeyDataset(dataset, "smi")
 
         def PrependAndAppend(dataset, pre_token, app_token):
             dataset = PrependTokenDataset(dataset, pre_token)
             return AppendTokenDataset(dataset, app_token)
 
-
-
         dataset = RemoveHydrogenDataset(dataset, "atoms", "coordinates", True, True)
-
 
         apo_dataset = NormalizeDataset(dataset, "coordinates")
 
@@ -375,7 +392,6 @@ class DrugCLIP(UnicoreTask):
         distance_dataset = DistanceDataset(coord_dataset)
         coord_dataset = PrependAndAppend(coord_dataset, 0.0, 0.0)
         distance_dataset = PrependAndAppend2DDataset(distance_dataset, 0.0)
-
 
         nest_dataset = NestedDictionaryDataset(
             {
@@ -394,15 +410,13 @@ class DrugCLIP(UnicoreTask):
                     ),
                 },
                 "smi_name": RawArrayDataset(smi_dataset),
-                "target":  RawArrayDataset(label_dataset),
+                "target": RawArrayDataset(label_dataset),
                 "mol_len": RawArrayDataset(len_dataset),
             },
         )
         return nest_dataset
-    
 
-    def load_retrieval_mols_dataset(self, data_path,atoms,coords, **kwargs):
- 
+    def load_retrieval_mols_dataset(self, data_path, atoms, coords, **kwargs):
         dataset = LMDBDataset(data_path)
         dataset = AffinityMolDataset(
             dataset,
@@ -411,17 +425,14 @@ class DrugCLIP(UnicoreTask):
             coords,
             False,
         )
-        
+
         smi_dataset = KeyDataset(dataset, "smi")
 
         def PrependAndAppend(dataset, pre_token, app_token):
             dataset = PrependTokenDataset(dataset, pre_token)
             return AppendTokenDataset(dataset, app_token)
 
-
-
         dataset = RemoveHydrogenDataset(dataset, "atoms", "coordinates", True, True)
-
 
         apo_dataset = NormalizeDataset(dataset, "coordinates")
 
@@ -439,7 +450,6 @@ class DrugCLIP(UnicoreTask):
         distance_dataset = DistanceDataset(coord_dataset)
         coord_dataset = PrependAndAppend(coord_dataset, 0.0, 0.0)
         distance_dataset = PrependAndAppend2DDataset(distance_dataset, 0.0)
-
 
         nest_dataset = NestedDictionaryDataset(
             {
@@ -464,16 +474,15 @@ class DrugCLIP(UnicoreTask):
         return nest_dataset
 
     def load_pockets_dataset(self, data_path, **kwargs):
-
         dataset = LMDBDataset(data_path)
- 
+
         dataset = AffinityPocketDataset(
             dataset,
             self.args.seed,
             "pocket_atoms",
             "pocket_coordinates",
             False,
-            "pocket"
+            "pocket",
         )
         poc_dataset = KeyDataset(dataset, "pocket")
 
@@ -496,12 +505,7 @@ class DrugCLIP(UnicoreTask):
             self.args.max_pocket_atoms,
         )
 
-
-
-
         apo_dataset = NormalizeDataset(dataset, "pocket_coordinates")
-
-
 
         src_pocket_dataset = KeyDataset(apo_dataset, "pocket_atoms")
         len_dataset = LengthDataset(src_pocket_dataset)
@@ -552,20 +556,18 @@ class DrugCLIP(UnicoreTask):
         )
         return nest_dataset
 
-    
-
     def build_model(self, args):
         from unicore import models
 
         model = models.build_model(args, self)
-        
+
         if args.finetune_mol_model is not None:
             print("load pretrain model weight from...", args.finetune_mol_model)
             state = checkpoint_utils.load_checkpoint_to_cpu(
                 args.finetune_mol_model,
             )
             model.mol_model.load_state_dict(state["model"], strict=False)
-            
+
         if args.finetune_pocket_model is not None:
             print("load pretrain model weight from...", args.finetune_pocket_model)
             state = checkpoint_utils.load_checkpoint_to_cpu(
@@ -575,9 +577,7 @@ class DrugCLIP(UnicoreTask):
 
         return model
 
-    def train_step(
-        self, sample, model, loss, optimizer, update_num, ignore_grad=False
-    ):
+    def train_step(self, sample, model, loss, optimizer, update_num, ignore_grad=False):
         """
         Do forward and backward, and return the loss as computed by *loss*
         for the given *model* and *sample*.
@@ -608,30 +608,31 @@ class DrugCLIP(UnicoreTask):
         with torch.autograd.profiler.record_function("backward"):
             optimizer.backward(loss)
         return loss, sample_size, logging_output
-    
+
     def valid_step(self, sample, model, loss, test=False):
         model.eval()
         with torch.no_grad():
             loss, sample_size, logging_output = loss(model, sample)
         return loss, sample_size, logging_output
 
-
     def test_pcba_target(self, name, model, **kwargs):
         """Encode a dataset with the molecule encoder."""
 
-        #names = "PPARG"
+        # names = "PPARG"
         data_path = "./data/lit_pcba/" + name + "/mols.lmdb"
         mol_dataset = self.load_mols_dataset(data_path, "atoms", "coordinates")
         num_data = len(mol_dataset)
-        bsz=64
-        #print(num_data//bsz)
+        bsz = 64
+        # print(num_data//bsz)
         mol_reps = []
         mol_names = []
         labels = []
-        
+
         # generate mol data
-        
-        mol_data = torch.utils.data.DataLoader(mol_dataset, batch_size=bsz, collate_fn=mol_dataset.collater)
+
+        mol_data = torch.utils.data.DataLoader(
+            mol_dataset, batch_size=bsz, collate_fn=mol_dataset.collater
+        )
         for _, sample in enumerate(tqdm(mol_data)):
             sample = unicore.utils.move_to_cuda(sample)
             dist = sample["net_input"]["mol_src_distance"]
@@ -639,7 +640,7 @@ class DrugCLIP(UnicoreTask):
             st = sample["net_input"]["mol_src_tokens"]
             mol_padding_mask = st.eq(model.mol_model.padding_idx)
             mol_x = model.mol_model.embed_tokens(st)
-            
+
             n_node = dist.size(-1)
             gbf_feature = model.mol_model.gbf(dist, et)
 
@@ -650,7 +651,7 @@ class DrugCLIP(UnicoreTask):
             mol_outputs = model.mol_model.encoder(
                 mol_x, padding_mask=mol_padding_mask, attn_mask=graph_attn_bias
             )
-            mol_encoder_rep = mol_outputs[0][:,0,:]
+            mol_encoder_rep = mol_outputs[0][:, 0, :]
             mol_emb = model.mol_project(mol_encoder_rep)
             mol_emb = mol_emb / mol_emb.norm(dim=1, keepdim=True)
             mol_emb = mol_emb.detach().cpu().numpy()
@@ -662,7 +663,9 @@ class DrugCLIP(UnicoreTask):
         # generate pocket data
         data_path = "./data/lit_pcba/" + name + "/pockets.lmdb"
         pocket_dataset = self.load_pockets_dataset(data_path)
-        pocket_data = torch.utils.data.DataLoader(pocket_dataset, batch_size=bsz, collate_fn=pocket_dataset.collater)
+        pocket_data = torch.utils.data.DataLoader(
+            pocket_dataset, batch_size=bsz, collate_fn=pocket_dataset.collater
+        )
         pocket_reps = []
 
         for _, sample in enumerate(tqdm(pocket_data)):
@@ -681,7 +684,7 @@ class DrugCLIP(UnicoreTask):
             pocket_outputs = model.pocket_model.encoder(
                 pocket_x, padding_mask=pocket_padding_mask, attn_mask=graph_attn_bias
             )
-            pocket_encoder_rep = pocket_outputs[0][:,0,:]
+            pocket_encoder_rep = pocket_outputs[0][:, 0, :]
             pocket_emb = model.pocket_project(pocket_encoder_rep)
             pocket_emb = pocket_emb / pocket_emb.norm(dim=1, keepdim=True)
             pocket_emb = pocket_emb.detach().cpu().numpy()
@@ -694,34 +697,21 @@ class DrugCLIP(UnicoreTask):
         auc, bedroc, ef_list, re_list = cal_metrics(labels, res_single, 80.5)
 
         return auc, bedroc, ef_list, re_list
-    
-    
-    
 
     def test_pcba(self, model, **kwargs):
-        #ckpt_date = self.args.finetune_from_model.split("/")[-2]
-        #save_name = "/home/gaobowen/DrugClip/test_results/pcba/" + ckpt_date + ".txt"
+        # ckpt_date = self.args.finetune_from_model.split("/")[-2]
+        # save_name = "/home/gaobowen/DrugClip/test_results/pcba/" + ckpt_date + ".txt"
         save_name = ""
-        
+
         targets = os.listdir("./data/lit_pcba/")
 
-        #print(targets)
+        # print(targets)
         auc_list = []
         ef_list = []
         bedroc_list = []
 
-        re_list = {
-            "0.005": [],
-            "0.01": [],
-            "0.02": [],
-            "0.05": []
-        }
-        ef_list = {
-            "0.005": [],
-            "0.01": [],
-            "0.02": [],
-            "0.05": []
-        }
+        re_list = {"0.005": [], "0.01": [], "0.02": [], "0.05": []}
+        ef_list = {"0.005": [], "0.01": [], "0.02": [], "0.05": []}
         for target in targets:
             auc, bedroc, ef, re = self.test_pcba_target(target, model)
             auc_list.append(auc)
@@ -742,35 +732,36 @@ class DrugCLIP(UnicoreTask):
         print("bedroc 50%", np.percentile(bedroc_list, 50))
         print("bedroc 75%", np.percentile(bedroc_list, 75))
         print("bedroc mean", np.mean(bedroc_list))
-        #print(np.median(auc_list))
-        #print(np.median(ef_list))
+        # print(np.median(auc_list))
+        # print(np.median(ef_list))
         for key in ef_list:
             print("ef", key, "25%", np.percentile(ef_list[key], 25))
-            print("ef",key, "50%", np.percentile(ef_list[key], 50))
-            print("ef",key, "75%", np.percentile(ef_list[key], 75))
-            print("ef",key, "mean", np.mean(ef_list[key]))
+            print("ef", key, "50%", np.percentile(ef_list[key], 50))
+            print("ef", key, "75%", np.percentile(ef_list[key], 75))
+            print("ef", key, "mean", np.mean(ef_list[key]))
         for key in re_list:
-            print("re",key, "25%", np.percentile(re_list[key], 25))
-            print("re",key, "50%", np.percentile(re_list[key], 50))
-            print("re",key, "75%", np.percentile(re_list[key], 75))
-            print("re",key, "mean", np.mean(re_list[key]))
+            print("re", key, "25%", np.percentile(re_list[key], 25))
+            print("re", key, "50%", np.percentile(re_list[key], 50))
+            print("re", key, "75%", np.percentile(re_list[key], 75))
+            print("re", key, "mean", np.mean(re_list[key]))
 
-        return 
-    
+        return
+
     def test_dude_target(self, target, model, **kwargs):
-
         data_path = "./data/DUD-E/raw/all/" + target + "/mols.lmdb"
         mol_dataset = self.load_mols_dataset(data_path, "atoms", "coordinates")
         num_data = len(mol_dataset)
-        bsz=64
-        print(num_data//bsz)
+        bsz = 64
+        print(num_data // bsz)
         mol_reps = []
         mol_names = []
         labels = []
-        
+
         # generate mol data
-        
-        mol_data = torch.utils.data.DataLoader(mol_dataset, batch_size=bsz, collate_fn=mol_dataset.collater)
+
+        mol_data = torch.utils.data.DataLoader(
+            mol_dataset, batch_size=bsz, collate_fn=mol_dataset.collater
+        )
         for _, sample in enumerate(tqdm(mol_data)):
             sample = unicore.utils.move_to_cuda(sample)
             dist = sample["net_input"]["mol_src_distance"]
@@ -787,13 +778,13 @@ class DrugCLIP(UnicoreTask):
             mol_outputs = model.mol_model.encoder(
                 mol_x, padding_mask=mol_padding_mask, attn_mask=graph_attn_bias
             )
-            mol_encoder_rep = mol_outputs[0][:,0,:]
+            mol_encoder_rep = mol_outputs[0][:, 0, :]
             mol_emb = mol_encoder_rep
             mol_emb = model.mol_project(mol_encoder_rep)
             mol_emb = mol_emb / mol_emb.norm(dim=-1, keepdim=True)
-            #print(mol_emb.dtype)
+            # print(mol_emb.dtype)
             mol_emb = mol_emb.detach().cpu().numpy()
-            #print(mol_emb.dtype)
+            # print(mol_emb.dtype)
             mol_reps.append(mol_emb)
             mol_names.extend(sample["smi_name"])
             labels.extend(sample["target"].detach().cpu().numpy())
@@ -802,7 +793,9 @@ class DrugCLIP(UnicoreTask):
         # generate pocket data
         data_path = "./data/DUD-E/raw/all/" + target + "/pocket.lmdb"
         pocket_dataset = self.load_pockets_dataset(data_path)
-        pocket_data = torch.utils.data.DataLoader(pocket_dataset, batch_size=bsz, collate_fn=pocket_dataset.collater)
+        pocket_data = torch.utils.data.DataLoader(
+            pocket_dataset, batch_size=bsz, collate_fn=pocket_dataset.collater
+        )
         pocket_reps = []
 
         for _, sample in enumerate(tqdm(pocket_data)):
@@ -821,8 +814,8 @@ class DrugCLIP(UnicoreTask):
             pocket_outputs = model.pocket_model.encoder(
                 pocket_x, padding_mask=pocket_padding_mask, attn_mask=graph_attn_bias
             )
-            pocket_encoder_rep = pocket_outputs[0][:,0,:]
-            #pocket_emb = pocket_encoder_rep
+            pocket_encoder_rep = pocket_outputs[0][:, 0, :]
+            # pocket_emb = pocket_encoder_rep
             pocket_emb = model.pocket_project(pocket_encoder_rep)
             pocket_emb = pocket_emb / pocket_emb.norm(dim=-1, keepdim=True)
             pocket_emb = pocket_emb.detach().cpu().numpy()
@@ -834,22 +827,19 @@ class DrugCLIP(UnicoreTask):
         res_single = res.max(axis=0)
 
         auc, bedroc, ef_list, re_list = cal_metrics(labels, res_single, 80.5)
-        
-        
+
         print(target)
 
-        print(np.sum(labels), len(labels)-np.sum(labels))
+        print(np.sum(labels), len(labels) - np.sum(labels))
 
         return auc, bedroc, ef_list, re_list, res_single, labels
 
     def test_dude(self, model, **kwargs):
-
-
         targets = os.listdir("./data/DUD-E/raw/all/")
         auc_list = []
         bedroc_list = []
         ef_list = []
-        res_list= []
+        res_list = []
         labels_list = []
         re_list = {
             "0.005": [],
@@ -863,8 +853,10 @@ class DrugCLIP(UnicoreTask):
             "0.02": [],
             "0.05": [],
         }
-        for i,target in enumerate(targets):
-            auc, bedroc, ef, re, res_single, labels = self.test_dude_target(target, model)
+        for i, target in enumerate(targets):
+            auc, bedroc, ef, re, res_single, labels = self.test_dude_target(
+                target, model
+            )
             auc_list.append(auc)
             bedroc_list.append(bedroc)
             for key in ef:
@@ -882,19 +874,13 @@ class DrugCLIP(UnicoreTask):
             print("ef", key, "mean", np.mean(ef_list[key]))
 
         for key in re_list:
-            print("re", key, "mean",  np.mean(re_list[key]))
+            print("re", key, "mean", np.mean(re_list[key]))
 
-        # save printed results 
-        
-        
+        # save printed results
+
         return
-    
-    
-    
-    
-    
+
     def encode_mols_once(self, model, data_path, emb_dir, atoms, coords, **kwargs):
-        
         # cache path is embdir/data_path.pkl
 
         cache_path = os.path.join(emb_dir, data_path.split("/")[-1] + ".pkl")
@@ -904,11 +890,17 @@ class DrugCLIP(UnicoreTask):
                 mol_reps, mol_names = pickle.load(f)
             return mol_reps, mol_names
 
-        mol_dataset = self.load_retrieval_mols_dataset(data_path,atoms,coords)
+        mol_dataset = self.load_retrieval_mols_dataset(data_path, atoms, coords)
         mol_reps = []
         mol_names = []
-        bsz=32
-        mol_data = torch.utils.data.DataLoader(mol_dataset, batch_size=bsz, collate_fn=mol_dataset.collater)
+
+        # bsz=32
+        bsz = getattr(self.args, "batch_size", 32)
+        print(f"当前分子编码 Batch Size: {bsz}")
+
+        mol_data = torch.utils.data.DataLoader(
+            mol_dataset, batch_size=bsz, collate_fn=mol_dataset.collater
+        )
         for _, sample in enumerate(tqdm(mol_data)):
             sample = unicore.utils.move_to_cuda(sample)
             dist = sample["net_input"]["mol_src_distance"]
@@ -925,7 +917,7 @@ class DrugCLIP(UnicoreTask):
             mol_outputs = model.mol_model.encoder(
                 mol_x, padding_mask=mol_padding_mask, attn_mask=graph_attn_bias
             )
-            mol_encoder_rep = mol_outputs[0][:,0,:]
+            mol_encoder_rep = mol_outputs[0][:, 0, :]
             mol_emb = model.mol_project(mol_encoder_rep)
             mol_emb = mol_emb / mol_emb.norm(dim=-1, keepdim=True)
             mol_emb = mol_emb.detach().cpu().numpy()
@@ -935,19 +927,22 @@ class DrugCLIP(UnicoreTask):
         mol_reps = np.concatenate(mol_reps, axis=0)
 
         # save the results
-        
+
         with open(cache_path, "wb") as f:
             pickle.dump([mol_reps, mol_names], f)
 
         return mol_reps, mol_names
-    
+
     def retrieve_mols(self, model, mol_path, pocket_path, emb_dir, k, **kwargs):
- 
-        os.makedirs(emb_dir, exist_ok=True)        
-        mol_reps, mol_names = self.encode_mols_once(model, mol_path, emb_dir,  "atoms", "coordinates")
-        
+        os.makedirs(emb_dir, exist_ok=True)
+        mol_reps, mol_names = self.encode_mols_once(
+            model, mol_path, emb_dir, "atoms", "coordinates"
+        )
+
         pocket_dataset = self.load_pockets_dataset(pocket_path)
-        pocket_data = torch.utils.data.DataLoader(pocket_dataset, batch_size=16, collate_fn=pocket_dataset.collater)
+        pocket_data = torch.utils.data.DataLoader(
+            pocket_dataset, batch_size=16, collate_fn=pocket_dataset.collater
+        )
         pocket_reps = []
         pocket_names = []
         for _, sample in enumerate(tqdm(pocket_data)):
@@ -966,42 +961,21 @@ class DrugCLIP(UnicoreTask):
             pocket_outputs = model.pocket_model.encoder(
                 pocket_x, padding_mask=pocket_padding_mask, attn_mask=graph_attn_bias
             )
-            pocket_encoder_rep = pocket_outputs[0][:,0,:]
+            pocket_encoder_rep = pocket_outputs[0][:, 0, :]
             pocket_emb = model.pocket_project(pocket_encoder_rep)
             pocket_emb = pocket_emb / pocket_emb.norm(dim=-1, keepdim=True)
             pocket_emb = pocket_emb.detach().cpu().numpy()
             pocket_reps.append(pocket_emb)
             pocket_names.extend(sample["pocket_name"])
         pocket_reps = np.concatenate(pocket_reps, axis=0)
-        
+
         res = pocket_reps @ mol_reps.T
         res = res.max(axis=0)
 
-
         # get top k results
 
-        
         top_k = np.argsort(res)[::-1][:k]
 
         # return names and scores
-        
+
         return [mol_names[i] for i in top_k], res[top_k]
-
-
-        
-
-        
-         
-
-
-    
-
-    
-
-        
-            
-         
-
-        
-    
-    

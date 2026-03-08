@@ -6,15 +6,18 @@
 
 import logging
 import os
+# import pickle
 import sys
-import pickle
+
+# import numpy as np
 import torch
-from unicore import checkpoint_utils, distributed_utils, options, utils
-from unicore.logging import progress_bar
-from unicore import tasks
-import numpy as np
-from tqdm import tqdm
-import unicore
+# import unicore
+# from rdkit.ML.Scoring.Scoring import CalcAUC, CalcBEDROC, CalcEnrichment
+# from skchem.metrics import bedroc_score
+# from sklearn.metrics import roc_curve
+# from tqdm import tqdm
+from unicore import checkpoint_utils, distributed_utils, options, tasks
+# from unicore.logging import progress_bar
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -25,25 +28,17 @@ logging.basicConfig(
 logger = logging.getLogger("unimol.inference")
 
 
-#from skchem.metrics import bedroc_score
-from rdkit.ML.Scoring.Scoring import CalcBEDROC, CalcAUC, CalcEnrichment
-from sklearn.metrics import roc_curve
-
-
-
 def main(args):
-
     use_fp16 = args.fp16
     use_cuda = torch.cuda.is_available() and not args.cpu
 
     if use_cuda:
         torch.cuda.set_device(args.device_id)
 
-
     # Load model
     logger.info("loading model(s) from {}".format(args.path))
     state = checkpoint_utils.load_checkpoint_to_cpu(args.path)
-    task = tasks.setup_task(args)
+    task = tasks.setup_task(args)  # 加载原子类型到数字ID的映射关系
     model = task.build_model(args)
     model.load_state_dict(state["model"], strict=False)
 
@@ -56,25 +51,29 @@ def main(args):
     # Print args
     logger.info(args)
 
-
     model.eval()
-    
-    names, scores = task.retrieve_mols(model, args.mol_path, args.pocket_path, args.emb_dir, 10000)
+
+    names, scores = task.retrieve_mols(
+        model, args.mol_path, args.pocket_path, args.emb_dir, 10000
+    )
 
     # save to ranked_compounds.txt
-    with open(os.path.join(args.emb_dir, 'ranked_compounds.txt'), 'w') as f:
+    with open(os.path.join(args.emb_dir, "ranked_compounds.txt"), "w") as f:
         for name, score in zip(names, scores):
             f.write(f"{name}\t{score}\n")
 
 
 def cli_main():
     # add args
-    
 
     parser = options.get_validation_parser()
     parser.add_argument("--mol-path", type=str, default="", help="path for mol data")
-    parser.add_argument("--pocket-path", type=str, default="", help="path for pocket data")
-    parser.add_argument("--emb-dir", type=str, default="", help="path for saved embedding data")
+    parser.add_argument(
+        "--pocket-path", type=str, default="", help="path for pocket data"
+    )
+    parser.add_argument(
+        "--emb-dir", type=str, default="", help="path for saved embedding data"
+    )
     options.add_model_args(parser)
     args = options.parse_args_and_arch(parser)
 

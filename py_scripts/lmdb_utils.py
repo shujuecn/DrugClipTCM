@@ -5,11 +5,6 @@ import selfies as sf
 from tqdm import tqdm, trange
 
 
-
-
-
-
-
 def read_lmdb(lmdb_path):
     env = lmdb.open(
         lmdb_path,
@@ -19,7 +14,7 @@ def read_lmdb(lmdb_path):
         readahead=False,
         meminit=False,
         max_readers=256,
-    )  
+    )
     txn = env.begin()
     keys = list(txn.cursor().iternext(values=False))
     out_list = []
@@ -29,12 +24,10 @@ def read_lmdb(lmdb_path):
         out_list.append(data)
         print(len(data["coordinates"]))
     env.close()
-    return out_list 
-
+    return out_list
 
 
 def write_lmdb(out_list, save_path):
-    
     env = lmdb.open(
         save_path,
         subdir=False,
@@ -42,13 +35,12 @@ def write_lmdb(out_list, save_path):
         readahead=False,
         meminit=False,
         max_readers=64,
-        map_size=1099511627776
+        map_size=1099511627776,
     )
 
     with env.begin(write=True) as lmdb_txn:
         for i in tqdm(range(len(out_list))):
-            lmdb_txn.put(str(i).encode('ascii'), pickle.dumps(out_list[i]))
-
+            lmdb_txn.put(str(i).encode("ascii"), pickle.dumps(out_list[i]))
 
 
 if __name__ == "__main__":
@@ -57,7 +49,7 @@ if __name__ == "__main__":
     lmdb_path = "./data/train_no_test_af/train.lmdb"
     data = read_lmdb(lmdb_path)
     print(data[0].keys())
-    #print(len(data[1]["coordinates"]))
+    # print(len(data[1]["coordinates"]))
 
     dic = {
         "atoms": "atom types for each atom in the ligand",
@@ -68,7 +60,3 @@ if __name__ == "__main__":
         "smi": "SMILES string for the ligand",
         "pocket": "pdbid of the pocket",
     }
-
-    
-
-    
