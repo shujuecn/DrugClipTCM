@@ -116,6 +116,55 @@ bash retrieval.sh
 
 In the google drive folder, you can find example file for pocket.lmdb and mols.lmdb under retrieval dir.
 
+## TCMSP Pilot Retrieval Pipeline
+
+This repo now includes a lightweight bridge from local `TCMSP` structure files (`mol2`
+or `sdf`) to the
+LMDB format consumed by `unimol/retrieval.py`.
+
+### 1. Build the standardized table and retrieval LMDB
+
+```bash
+python scripts/build_tcmsp_retrieval_assets.py \
+  --input-dir data/TCMSP \
+  --output-dir results/tcmsp_assets
+```
+
+Default outputs:
+
+- `results/tcmsp_assets/tcmsp_standardized_compounds.csv`
+- `results/tcmsp_assets/tcmsp_retrieval.lmdb`
+
+The CSV keeps one row per local TCMSP structure file and records identifiers, formula, molecular
+weight, atom counts, and whether the atom symbols are covered by
+`data_dict/dict_mol.txt`. The LMDB stores the keys required by retrieval:
+`atoms`, `coordinates`, and `smi`.
+
+Useful flags:
+
+- `--limit 100` for a smoke test
+- `--skip-lmdb` to only export the standardized table
+- `--skip-unknown-atoms` to exclude molecules containing atom types outside the
+  current DrugCLIP atom dictionary
+- `--keep-failed` to keep failed parses in the CSV audit trail
+
+### 2. Run retrieval with your own checkpoint and pocket LMDB
+
+```bash
+POCKET_PATH=/abs/path/to/pocket.lmdb \
+WEIGHT_PATH=/abs/path/to/checkpoint_best.pt \
+bash run_tcmsp_retrieval.sh
+```
+
+Optional environment variables:
+
+- `MOL_PATH` defaults to `results/tcmsp_assets/tcmsp_retrieval.lmdb`
+- `EMB_DIR` defaults to `results/tcmsp_retrieval`
+- `BATCH_SIZE`, `NUM_WORKERS`, `CUDA_VISIBLE_DEVICES`, `PYTHON_BIN`
+
+This keeps the original `retrieval.sh` untouched while providing a dedicated,
+repo-local path for the TCMSP pilot workflow.
+
 
 ## Citation
 
