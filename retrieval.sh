@@ -5,7 +5,7 @@ export PYTHONPATH=$PYTHONPATH:$(pwd)/Uni-Core
 BATCH_SIZE=256
 NUM_WORKERS=8
 
-DATA_PATH="./data"
+DATA_PATH="./data_dict"
 WEIGHT_PATH="/mnt/e/Workspace/260217-DrugClip/files/checkpoint_best.pt"
 MOL_PATH="/mnt/e/Workspace/260217-DrugClip/files/retrieval/mols.lmdb" # path to the molecule file
 POCKET_PATH="/mnt/e/Workspace/260217-DrugClip/files/retrieval/pocket.lmdb" # path to the pocket file

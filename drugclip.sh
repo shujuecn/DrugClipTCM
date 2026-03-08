@@ -1,6 +1,6 @@
 
 
-data_path="data"
+data_path="data_dict"
 
 
 save_dir="savedir"

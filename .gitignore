@@ -1,6 +1,7 @@
 # ==== Project====
 result*/
 materials/
+data/
 
 # ==== Python ====
 .vscode/
