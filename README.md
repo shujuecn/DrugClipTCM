@@ -116,37 +116,43 @@ bash retrieval.sh
 
 In the google drive folder, you can find example file for pocket.lmdb and mols.lmdb under retrieval dir.
 
-## TCMSP Pilot Retrieval Pipeline
+## Retrieval Asset Builder
 
-This repo now includes a lightweight bridge from local `TCMSP` structure files (`mol2`
-or `sdf`) to the
-LMDB format consumed by `unimol/retrieval.py`.
+This repo now includes a single builder for local TCM libraries. It can rebuild
+`TCMSP`, `HIT`, and `HERB2` in one run, with progress bars, log files, and
+provenance fields preserved in both CSV and LMDB outputs.
 
-### 1. Build the standardized table and retrieval LMDB
+### 1. Build one or more molecule libraries
 
 ```bash
-python scripts/build_tcmsp_retrieval_assets.py \
-  --input-dir data/TCMSP \
-  --output-dir results/tcmsp_assets
+python scripts/build_retrieval_assets.py \
+  --libraries tcmsp hit herb2
 ```
 
 Default outputs:
 
-- `results/tcmsp_assets/tcmsp_standardized_compounds.csv`
-- `results/tcmsp_assets/tcmsp_retrieval.lmdb`
+- `data/tcmsp_assets/tcmsp_standardized_compounds.csv`
+- `data/tcmsp_assets/tcmsp_retrieval.lmdb`
+- `data/hit_assets/hit_standardized_compounds.csv`
+- `data/hit_assets/hit_retrieval.lmdb`
+- `data/herb2_assets/herb2_standardized_compounds.csv`
+- `data/herb2_assets/herb2_retrieval.lmdb`
 
-The CSV keeps one row per local TCMSP structure file and records identifiers, formula, molecular
-weight, atom counts, and whether the atom symbols are covered by
-`data_dict/dict_mol.txt`. The LMDB stores the keys required by retrieval:
-`atoms`, `coordinates`, and `smi`.
+The standardized CSV keeps reverse lookup fields such as `compound_key`,
+`inchikey`, `herb_ids`, `herb_names`, `target_ids`, `target_symbols`, and
+`diseases`. The LMDB stores the retrieval keys `atoms`, `coordinates`, and
+`smi`, plus the same provenance fields for downstream backtracking.
 
 Useful flags:
 
-- `--limit 100` for a smoke test
-- `--skip-lmdb` to only export the standardized table
+- `--limit 100` for a smoke test per library
+- `--workers 8` to control RDKit parallelism
+- `--skip-lmdb` to only export standardized tables
 - `--skip-unknown-atoms` to exclude molecules containing atom types outside the
   current DrugCLIP atom dictionary
-- `--keep-failed` to keep failed parses in the CSV audit trail
+- `--output-root results/retrieval_assets` to place all library outputs under a
+  single root directory
+- `--log-path logs/rebuild_assets.log` to pin the log file location
 
 ### 2. Run retrieval with your own checkpoint and pocket LMDB
 
@@ -170,18 +176,12 @@ repo-local path for the TCMSP pilot workflow.
 `run_tcmsp_retrieval.sh` is generic despite its name: any retrieval LMDB can be
 used by overriding `MOL_PATH`.
 
-For tabular libraries with SMILES (or resolvable PubChem CID), use:
+For BatmanTCM2.0 with CID-only entries, the same builder can optionally resolve
+PubChem CID to SMILES:
 
 ```bash
-python scripts/build_tabular_retrieval_assets.py --library hit
-python scripts/build_tabular_retrieval_assets.py --library herb2
-```
-
-BatmanTCM2.0 needs CID resolution before it can become a molecule LMDB:
-
-```bash
-python scripts/build_tabular_retrieval_assets.py \
-  --library batman \
+python scripts/build_retrieval_assets.py \
+  --libraries batman \
   --resolve-cids \
   --cid-cache-csv data/batman_cid_smiles_cache.csv
 ```
