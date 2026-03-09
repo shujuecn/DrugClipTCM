@@ -165,6 +165,31 @@ Optional environment variables:
 This keeps the original `retrieval.sh` untouched while providing a dedicated,
 repo-local path for the TCMSP pilot workflow.
 
+## Other Library Assets
+
+`run_tcmsp_retrieval.sh` is generic despite its name: any retrieval LMDB can be
+used by overriding `MOL_PATH`.
+
+For tabular libraries with SMILES (or resolvable PubChem CID), use:
+
+```bash
+python scripts/build_tabular_retrieval_assets.py --library hit
+python scripts/build_tabular_retrieval_assets.py --library herb2
+```
+
+BatmanTCM2.0 needs CID resolution before it can become a molecule LMDB:
+
+```bash
+python scripts/build_tabular_retrieval_assets.py \
+  --library batman \
+  --resolve-cids \
+  --cid-cache-csv data/batman_cid_smiles_cache.csv
+```
+
+Each generated LMDB record preserves provenance fields such as `compound_key`,
+`inchikey`, `herb_ids`, `herb_names`, `target_ids`, and `target_symbols`, and the
+paired standardized CSV keeps the same information in a query-friendly format.
+
 
 ## Citation
 
